@@ -1,1 +1,1 @@
-initSidebarItems({"mod":[["resolver","DNS resolver and connector utility actor"],["signal","An actor implementation of Unix signal handling"]]});
+initSidebarItems({"mod":[["mocker","Mocking utility actor."],["resolver","DNS resolver and connector utility actor"]]});

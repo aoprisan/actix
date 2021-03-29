@@ -1,1 +1,1 @@
-initSidebarItems({"enum":[["ResolverError",""]],"struct":[["Connect",""],["ConnectAddr",""],["Resolve",""],["Resolver",""],["TcpConnector","Tcp stream connector"]],"type":[["Connector",""],["ConnectorError",""]]});
+initSidebarItems({"enum":[["ResolverError",""]],"struct":[["Connect",""],["ConnectAddr",""],["Resolve",""],["Resolver",""],["TcpConnector","A TCP stream connector."]],"type":[["Connector",""],["ConnectorError",""]]});
