@@ -55,6 +55,116 @@ cargo run --example weak_recipient
 
 ## Architecture
 
+### Visual Overview
+
+**Actor Lifecycle State Machine:**
+```
+                    ┌─────────────┐
+                    │   Started   │
+                    └──────┬──────┘
+                           │ started() called
+                           ▼
+    ┌──────────────────────────────────────┐
+    │            Running                    │◄──┐
+    │  (processing messages)                │   │
+    └──────┬───────────────────────────┬───┘   │
+           │                           │       │
+           │ • Context::stop()         │       │ • Create new Addr
+           │ • All Addr dropped        │       │ • Add evented objects
+           │ • No evented objects      │       │   (futures/streams)
+           │                           │       │
+           ▼                           │       │
+    ┌──────────────┐                  │       │
+    │   Stopping   │──────────────────┘       │
+    │              │──────────────────────────┘
+    └──────┬───────┘  stopping() → Running::Continue
+           │
+           │ stopping() → Running::Stop
+           ▼
+    ┌──────────────┐
+    │   Stopped    │ (actor dropped)
+    └──────────────┘
+```
+
+**Message Flow Architecture:**
+```
+  ┌─────────────┐                    ┌─────────────┐
+  │  Actor A    │                    │  Actor B    │
+  │             │                    │             │
+  │  impl       │                    │  impl       │
+  │  Handler<M> │                    │  Actor      │
+  └──────┬──────┘                    └──────▲──────┘
+         │                                  │
+         │ 1. Get address                   │
+         │    let addr = ActorB.start()     │
+         │                                  │
+         │ 2. Send message                  │
+         │    addr.send(msg)                │
+         │         │                        │
+         │         ▼                        │
+         │    ┌─────────────────┐           │
+         │    │  Addr<ActorB>   │           │
+         │    │  or             │           │
+         │    │  Recipient<M>   │           │
+         │    └────────┬────────┘           │
+         │             │                    │
+         │             ▼                    │
+         │    ┌─────────────────┐           │
+         │    │    Mailbox      │           │
+         │    │  (crossbeam     │           │
+         │    │   channel)      │           │
+         │    └────────┬────────┘           │
+         │             │                    │
+         │             ▼                    │
+         │    ┌─────────────────┐           │
+         │    │   Context<B>    │───────────┘
+         │    │   polls mailbox │
+         │    └────────┬────────┘
+         │             │
+         │             ▼
+         │    ┌─────────────────┐
+         └────│  Handler::handle│
+              │  (msg, ctx)     │
+              └─────────────────┘
+                     │
+                     ▼
+              Return Response
+```
+
+**Component Hierarchy:**
+```
+┌─────────────────────────────────────────────────────────┐
+│                      System                              │
+│                   (Tokio runtime)                        │
+│                                                          │
+│  ┌────────────────────────────────────────────────────┐ │
+│  │              Arbiter (thread + event loop)         │ │
+│  │                                                    │ │
+│  │  ┌──────────────────────────────────────────────┐ │ │
+│  │  │         Actor Instance                       │ │ │
+│  │  │  ┌────────────────────────────────────────┐  │ │ │
+│  │  │  │      Context<Actor>                    │  │ │ │
+│  │  │  │                                        │  │ │ │
+│  │  │  │  • Mailbox                             │  │ │ │
+│  │  │  │  • Spawned Futures/Streams             │  │ │ │
+│  │  │  │  • Lifecycle management                │  │ │ │
+│  │  │  │  • Scheduled tasks                     │  │ │ │
+│  │  │  └────────────────────────────────────────┘  │ │ │
+│  │  │                                              │ │ │
+│  │  │  Addressed via: Addr<Actor> / WeakAddr<A>   │ │ │
+│  │  └──────────────────────────────────────────────┘ │ │
+│  │                                                    │ │
+│  │  (Multiple actors per arbiter)                    │ │
+│  └────────────────────────────────────────────────────┘ │
+│                                                          │
+│  (System can have multiple arbiters)                    │
+└──────────────────────────────────────────────────────────┘
+
+Registries:
+  • SystemRegistry: Global, shared across all arbiters
+  • Registry: Per-arbiter, thread-local services
+```
+
 ### Actor Model Fundamentals
 
 Actix implements the actor model where:
